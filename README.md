@@ -72,10 +72,12 @@ Figma 시안을 옮긴 이전 화면의 `index.html`·`src/main.js`·`src/style.
 `src/image`, `src/assets/icons` 는 이전 화면의 파일이고 지금 화면에서는 쓰지 않는다(빌드에 포함되지 않음).
 되돌리려면 `_legacy_figma/` 의 네 파일을 제자리에 복사하면 된다.
 
-## GitHub 및 자동 빌드
+## GitHub 및 자동 배포
 - 원격 저장소: https://github.com/ALL4UITeam/26_AF_livebusHP_Type02
 - 기본 브랜치: `main`
-- `main` push와 PR에서 GitHub Actions가 Node.js 22로 `npm ci`, `npm run build`를 실행한다.
-- GitHub의 Actions → Build → Run workflow에서 수동 실행할 수 있다.
-- 성공한 실행의 `dist` 아티팩트에서 빌드 결과를 내려받을 수 있다(14일 보관).
-- 이 워크플로는 빌드 검증용이며 웹사이트 배포는 별도로 설정한다.
+- 최초 설정: 저장소 Settings → Pages → Build and deployment → Source를 **GitHub Actions**로 선택한다.
+- `main` push와 PR에서 Node.js 22로 `npm ci`, `npm run build`를 실행한다.
+- `main` push 시 빌드 성공 후 GitHub Pages에 자동 배포한다. PR은 빌드만 검사한다.
+- Actions → Build and deploy Pages → Run workflow에서 `main`을 선택해 수동 배포할 수 있다.
+- 배포 주소: https://all4uiteam.github.io/26_AF_livebusHP_Type02/
+- 저장소 이름이나 배포 경로가 바뀌면 `vite.config.js`의 `base`도 수정한다.
