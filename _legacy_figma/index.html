@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>AI LIVEBUS · 초정밀·친환경 AI 버스정보 솔루션</title>
+    <meta name="description" content="초정밀측위와 AI 도착예측, 태양광 ePaper 기술로 사람과 환경을 지키는 차세대 구독형 버스정보시스템" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,500&family=Poppins:wght@400&display=swap" rel="stylesheet" />
+    <!-- 첫 페인트 전에 인트로 대기 상태를 건다. JS 가 실행되지 않으면 클래스가 없어 그대로 보인다. -->
+    <script>document.documentElement.classList.add('js', 'intro-pending');</script>
+    <style>
+      html { background: #9bb0b5; }
+      .intro-pending .site-header, .intro-pending .intro__title-inner, .intro-pending .scroll-hint, .intro-pending .intro__bus-inner { opacity: 0; }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#service">본문 서비스 소개로 건너뛰기</a>
+    <header class="site-header" data-theme="light"></header>
+
+    <main>
+      <!-- Figma 1:331 → 1:366 : 버스가 위로 지나가며 소개 문구가 드러남 -->
+      <section class="intro" id="top" data-header-theme="light" aria-labelledby="intro-title">
+        <div class="sticky">
+          <div class="stage">
+            <div class="intro__shadow" aria-hidden="true"></div>
+            <div class="intro__bus" aria-hidden="true"><div class="intro__bus-inner"><img src="/src/image/bus-hero.webp" alt="" width="1086" height="1448" fetchpriority="high"></div></div>
+
+            <h1 class="intro__title" id="intro-title"><span class="intro__title-inner">AI LIVE BUS</span></h1>
+            <button class="scroll-hint" type="button" aria-label="아래로 스크롤하여 소개 보기">
+              <span>SCROLL</span>
+              <img src="/src/assets/icons/chevron-down.svg" alt="" width="50" height="50">
+            </button>
+
+            <div class="intro__side intro__side--left">
+              <p class="intro__word">AI LIVE</p>
+              <p class="intro__sub">AI가 만드는 정확한 <br>버스 도착정보</p>
+            </div>
+            <div class="intro__side intro__side--right">
+              <p class="intro__word">BUS</p>
+              <p class="intro__sub">데이터로 움직이는 <br>스마트 모빌리티의 시작</p>
+            </div>
+            <div class="intro__summary">
+              <h2>초정밀측위 기반 클라우드 버스정보시스템</h2>
+              <p>초정밀 측위와 AI기술로 정확한 버스 도착정보를 제공하는 <br>클라우드 기반 통합솔루션입니다.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Figma 1:180 → 1:187 → 1:230 → 1:279 : 도로를 따라 버스가 내려가고 서비스 카드가 지나감 -->
+      <section class="drive" id="service" data-header-theme="dark" aria-labelledby="flow-title" tabindex="-1">
+        <div class="sticky">
+          <div class="drive__bg drive__bg--black" aria-hidden="true"></div>
+          <div class="road" aria-hidden="true">
+            <img class="road__line" src="/src/assets/icons/road-left.svg" alt="" width="2" height="1080">
+            <span class="road__center"></span>
+            <img class="road__line" src="/src/assets/icons/road-right.svg" alt="" width="2" height="1080">
+          </div>
+          <div class="drive__gra" aria-hidden="true"></div>
+          <div class="drive__topgra" aria-hidden="true"></div>
+
+          <div class="stage">
+            <div class="flow">
+              <p class="flow__label">초정밀·친환경 AI 버스정보 솔루션</p>
+              <h2 class="flow__title" id="flow-title">초정밀측위와 AI 도착예측, 태양광 ePager 기술로 <br>사람과 환경을 지키는 차세대 구독형 버스정보시스템</h2>
+            </div>
+            <div class="road-bus" aria-hidden="true">
+              <span class="road-bus__shadow"></span>
+              <span class="road-bus__body"><img src="/src/image/bus-road.webp" alt="" width="157" height="404"></span>
+            </div>
+            <div class="cards" aria-label="서비스 목록" role="region">
+              <p class="cards__state" data-state="loading">서비스 목록을 불러오는 중입니다…</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
