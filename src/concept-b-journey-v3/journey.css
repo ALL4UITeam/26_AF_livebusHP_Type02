@@ -1,0 +1,115 @@
+/* LIVEBUS B안 — 한 대의 버스와 함께 이어지는 여정 */
+:root {
+  /* 구도: 화면 전체가 3D 장면, 문구는 버스 반대편 여백에 세 줄 */
+  --black: #000105;
+  --ink: #eef6ff;
+  --dim: #8498b8;
+  --cyan: #46cfff;
+  --line: rgba(150, 195, 255, 0.26);
+  --font-en: "termina", "Lexend Exa", "Arial Black", sans-serif;
+  --font-kr: "Freesentation", "Pretendard Variable", Pretendard, "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --pad: clamp(20px, 3.4vw, 52px);
+  color-scheme: dark;
+}
+@font-face { font-family: "Freesentation"; font-weight: 400; font-display: swap; src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/2404@1.0/Freesentation-4Regular.woff2") format("woff2"); }
+@font-face { font-family: "Freesentation"; font-weight: 600; font-display: swap; src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/2404@1.0/Freesentation-6SemiBold.woff2") format("woff2"); }
+@font-face { font-family: "Freesentation"; font-weight: 700; font-display: swap; src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/2404@1.0/Freesentation-7Bold.woff2") format("woff2"); }
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+html { background: var(--black); }
+body { margin: 0; min-height: 100%; background: var(--black); color: var(--ink); font-family: var(--font-kr); -webkit-font-smoothing: antialiased; overflow-x: hidden; word-break: keep-all; }
+p, h1, h2, ol, ul { margin: 0; padding: 0; }
+ol, ul { list-style: none; }
+
+/* 화면 높이의 5.8배가 진행률 1. 전체 진행률 2.3 → 100 + 580 × 2.3 */
+.scroll-space { height: 1434vh; }
+.stage { position: fixed; inset: 0; overflow: hidden; }
+#scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 0.5s; }
+.is-ready #scene { opacity: 1; }
+.has-cursor .stage { cursor: none; }
+.has-cursor .stage a { cursor: pointer; }
+
+.brand { position: absolute; left: var(--pad); top: var(--pad); z-index: 3; display: block; line-height: 0; color: var(--ink); }
+.brand svg { display: block; width: clamp(104px, 9vw, 140px); height: auto; }
+.brand svg path { fill: currentColor; }
+
+/* 문구: 작은 서비스명 · 큰 핵심 문장 · 짧은 설명 */
+.copy { position: absolute; z-index: 2; left: var(--pad); top: 50%; width: min(36%, 540px); transform: translateY(-46%); opacity: 0; visibility: hidden; pointer-events: none; }
+.copy.is-on { opacity: 1; visibility: visible; }
+/* 도시 장면에서는 문구 뒤만 어둡게 눌러 읽히게 한다(상자가 아니라 번지는 어둠) */
+.copy:not([data-scene="1"])::before { content: ""; position: absolute; z-index: -1; inset: -70% -45% -70% -60%; background: radial-gradient(closest-side, rgba(0, 1, 5, 0.86), rgba(0, 1, 5, 0.6) 55%, rgba(0, 1, 5, 0)); }
+.copy.is-out { opacity: 0; visibility: visible; transition: opacity 0.26s ease; }   /* 나갈 때는 전체가 함께 */
+.copy__name { display: flex; align-items: center; gap: 12px; font: 700 clamp(12px, 1vw, 14.5px)/1.4 var(--font-en); letter-spacing: 0.08em; color: var(--cyan); }
+.copy__name::before { content: ""; width: 22px; height: 1px; background: currentColor; }
+.copy__name span { font-family: var(--font-kr); font-weight: 600; letter-spacing: 0; color: var(--ink); }
+.copy__head { margin-top: clamp(14px, 1.6vw, 22px); font-size: clamp(30px, 3.7vw, 60px); font-weight: 700; line-height: 1.22; letter-spacing: -0.02em; text-wrap: balance; }
+.copy__desc { margin-top: clamp(14px, 1.5vw, 22px); max-width: 26em; font-size: clamp(16px, 1.25vw, 19px); font-weight: 400; line-height: 1.65; color: #b9c7de; }
+.copy__cta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: clamp(22px, 2.4vw, 34px); opacity: 0; }
+.copy.is-on .copy__cta, .copy.is-out .copy__cta { opacity: 1; }
+.copy.is-on .copy__cta { transition: opacity 0.5s calc(var(--n) * 16ms + 320ms); }
+.cta { display: inline-flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 24px; border: 1px solid var(--cyan); border-radius: 4px; font-size: 16.5px; font-weight: 600; color: var(--ink); }
+.cta svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.copy__cta small { font-size: 12.5px; color: var(--dim); }
+.copy .w { display: inline-block; white-space: nowrap; }
+.copy .ch { display: inline-block; opacity: 0; transform: translateY(0.18em); }
+.copy.is-on .ch, .copy.is-out .ch { opacity: 1; transform: none; }
+.copy.is-on .ch { transition: opacity 0.42s calc(var(--i) * 16ms + 80ms) ease, transform 0.5s calc(var(--i) * 16ms + 80ms) cubic-bezier(0.2, 0.8, 0.2, 1); }
+.copy__name, .copy__desc { opacity: 0; }
+.copy.is-on .copy__name, .copy.is-out .copy__name, .copy.is-on .copy__desc, .copy.is-out .copy__desc { opacity: 1; }
+.copy.is-on .copy__name { transition: opacity 0.4s 0.02s; }
+.copy.is-on .copy__desc { transition: opacity 0.5s calc(var(--n) * 16ms + 160ms); }
+
+.scroll-hint { position: absolute; left: 50%; bottom: var(--pad); z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 10px; transform: translateX(-50%); font: 700 11.5px/1 var(--font-en); letter-spacing: 0.22em; color: var(--dim); opacity: 0; transition: opacity 0.4s; }
+.scroll-hint::after { content: ""; width: 1px; height: 34px; background: linear-gradient(var(--cyan), transparent); animation: hint 1.8s ease-in-out infinite; transform-origin: top; }
+.is-ready.at-start .scroll-hint { opacity: 1; transition-delay: 0.3s; }
+@keyframes hint { 0%, 100% { transform: scaleY(0.35); opacity: 0.5; } 50% { transform: scaleY(1); opacity: 1; } }
+
+/* 여정의 다섯 구간. 이번에 만든 것은 앞의 둘 */
+.rail { position: absolute; left: var(--pad); bottom: var(--pad); z-index: 2; width: min(420px, calc(100% - 2 * var(--pad))); }
+.rail__track { position: relative; display: block; height: 1px; background: var(--line); }
+.rail__mark { position: absolute; inset: 0; background: var(--cyan); transform-origin: left; transform: scaleX(0); }
+.rail ol { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 12px; font: 700 10.5px/1 var(--font-en); letter-spacing: 0.1em; color: var(--dim); }
+.rail li { transition: color 0.3s; }
+.rail li.is-now { color: var(--ink); }
+.rail li.is-later { opacity: 0.38; }
+
+.status { position: absolute; right: var(--pad); bottom: var(--pad); z-index: 2; text-align: right; font-size: 12.5px; line-height: 1.6; color: var(--dim); }
+.status b { font-weight: 600; color: #c4d3ea; }
+
+.cursor { display: none; position: fixed; left: 0; top: 0; z-index: 10; pointer-events: none; }
+.has-cursor .cursor { display: block; }
+.cursor__dot, .cursor__ring { position: absolute; left: 0; top: 0; border-radius: 50%; will-change: transform; transform: translate3d(-100px, -100px, 0); }
+.cursor__dot { width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; background: #e6f6ff; }
+.cursor__ring { width: 30px; height: 30px; margin: -15px 0 0 -15px; border: 1px solid rgba(90, 200, 255, 0.7); }
+
+/* 불러오는 동안: 로고와 가는 선 */
+.loader { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; background: var(--black); transition: opacity 0.5s, visibility 0s 0.5s; }
+.loader svg { width: 150px; height: auto; }
+.loader svg path { fill: var(--ink); }
+.loader i { display: block; width: 150px; height: 1px; margin-top: 18px; background: linear-gradient(90deg, transparent, var(--cyan), transparent); background-size: 60% 100%; background-repeat: no-repeat; animation: load 1.1s linear infinite; }
+@keyframes load { from { background-position: -80% 0; } to { background-position: 180% 0; } }
+.is-ready .loader { opacity: 0; visibility: hidden; }
+
+/* WebGL 을 쓸 수 없을 때: 대표 이미지와 문구 */
+.poster { display: none; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.no-gl .poster { display: block; }
+.no-gl #scene, .no-gl .rail, .no-gl .scroll-hint, .no-gl .cursor { display: none; }
+.no-gl .copy[data-scene="1"] { opacity: 1; visibility: visible; }
+.no-gl .copy[data-scene="1"] .ch, .no-gl .copy[data-scene="1"] .copy__name, .no-gl .copy[data-scene="1"] .copy__desc { opacity: 1; transform: none; }
+.no-gl .scroll-space { height: 0; }
+
+a:focus-visible, button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; border-radius: 2px; }
+
+@media (max-width: 760px), (max-aspect-ratio: 1/1) {
+  .copy { top: calc(var(--pad) + 64px); width: auto; right: var(--pad); transform: none; }
+  .copy__head { font-size: clamp(27px, 7.4vw, 40px); }
+  .rail { bottom: calc(var(--pad) + 52px); }
+  .rail ol { font-size: 9.5px; letter-spacing: 0.04em; }
+  .status { left: var(--pad); text-align: left; font-size: 12px; }
+  .scroll-hint { bottom: calc(var(--pad) + 112px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .copy.is-on .ch, .copy.is-on .copy__name, .copy.is-on .copy__desc { transition: opacity 0.3s; transform: none; }
+  .scroll-hint::after, .loader i { animation: none; }
+}

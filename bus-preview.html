@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LIVEBUS 버스 모델 확인용 화면</title>
+<meta name="robots" content="noindex">
+<style>
+  html, body { height: 100%; margin: 0; background: #000105; color: #dce8fa; font: 14px/1.5 "Pretendard Variable", Pretendard, "Noto Sans KR", "Malgun Gothic", sans-serif; overflow: hidden; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+  .bar { position: fixed; left: 16px; right: 16px; bottom: 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .bar button { min-height: 40px; padding: 0 14px; border: 1px solid rgba(150, 195, 255, 0.35); border-radius: 4px; background: rgba(7, 12, 22, 0.8); color: inherit; font: inherit; cursor: pointer; }
+  .bar button[aria-pressed="true"] { border-color: #46cfff; color: #fff; background: rgba(70, 207, 255, 0.16); }
+  .bar span { flex: 1; }
+  .note { position: fixed; left: 16px; top: 14px; max-width: 46em; color: #8ea3c4; }
+  .note b { color: #eef6ff; font-weight: 600; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<p class="note"><b>버스 모델 확인용 화면</b>(배포에 포함되지 않음) · <span id="which"></span><br>끌어서 돌리기, 휠로 거리 조절. 홈페이지 장면보다 밝은 조명이다.</p>
+<div class="bar">
+  <button data-view="front">전면 3/4</button><button data-view="side">측면(문 쪽)</button><button data-view="far">측면(반대쪽)</button><button data-view="rear">후면 3/4</button><button data-view="top">후면 상공</button><button data-view="close">앞머리 근접</button><button data-view="wheel">바퀴</button>
+  <span></span>
+  <button id="spin" aria-pressed="false">바퀴 회전</button><button id="swap"></button>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script type="module" src="/src/concept-b-journey/preview.js"></script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+/* LIVE FIELD — 검정 공간, 청색 입자. 화면에는 로고와 짧은 조작 안내만 둔다. */
+:root {
+  /* 구도: 화면 전체가 캔버스, 글자는 네 모서리에 작게 */
+  --black: #00010a;
+  --ink: #e9f4ff;          /* 청백색 글자 */
+  --dim: #7f95b8;          /* 보조 글자 */
+  --line: rgba(160, 200, 255, 0.28);
+  --cyan: #58c8ff;
+  --font-label: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-body: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+  --pad: clamp(18px, 3.2vw, 44px);
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+html { background: var(--black); }
+body { margin: 0; min-height: 100%; background: var(--black); color: var(--ink); font-family: var(--font-body); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+p, ol, ul, h1 { margin: 0; padding: 0; }
+ol, ul { list-style: none; }
+
+/* 스크롤 길이: 조형물(머무름) → 변형 → 버스(머무름) */
+.scroll-space { height: 320vh; }
+
+.stage { position: fixed; inset: 0; overflow: hidden; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+#field { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.has-cursor .stage { cursor: none; }
+.has-cursor .stage a, .has-cursor .stage button { cursor: pointer; }
+
+.brand { position: absolute; left: var(--pad); top: var(--pad); display: block; line-height: 0; color: var(--ink); }
+.brand svg { display: block; width: clamp(104px, 9.5vw, 148px); height: auto; }
+.brand svg path { fill: currentColor; }
+
+.tag { position: absolute; right: var(--pad); top: calc(var(--pad) + 4px); font: 500 12px/1.4 var(--font-label); letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+.tag b { font-weight: 500; color: var(--ink); }
+
+.hint { position: absolute; left: var(--pad); bottom: var(--pad); display: flex; flex-wrap: wrap; gap: 6px 22px; max-width: min(560px, calc(100% - 2 * var(--pad))); font-size: 14px; line-height: 1.5; color: var(--ink); }
+.hint li { display: flex; align-items: center; gap: 9px; transition: opacity 0.6s, color 0.6s; }
+.hint li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; border: 1px solid var(--cyan); transition: background-color 0.4s; }
+.hint li.is-done { color: var(--dim); }
+.hint li.is-done::before { background: var(--cyan); }
+
+.rail { position: absolute; right: var(--pad); bottom: calc(var(--pad) + 2px); display: flex; align-items: center; gap: 12px; font: 500 12px/1 var(--font-label); letter-spacing: 0.14em; color: var(--dim); }
+.rail span { transition: color 0.4s; }
+.rail[data-at="field"] .rail__a, .rail[data-at="bus"] .rail__b { color: var(--ink); }
+.rail__track { position: relative; width: clamp(64px, 9vw, 128px); height: 1px; background: var(--line); }
+.rail__mark { position: absolute; inset: 0; }
+.rail__mark::after { content: ""; position: absolute; left: -3px; top: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--ink); }
+
+/* 커서: 정확히 따라오는 작은 중심점 + 조금 늦는 얇은 링. 터치 환경에서는 표시하지 않는다 */
+.cursor { display: none; position: fixed; left: 0; top: 0; z-index: 10; pointer-events: none; }
+.has-cursor .cursor { display: block; }
+.cursor__dot, .cursor__ring { position: absolute; left: 0; top: 0; border-radius: 50%; will-change: transform; }
+.cursor__dot { width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; background: #e6f6ff; transform: translate3d(-100px, -100px, 0); }
+.cursor__ring { width: 30px; height: 30px; margin: -15px 0 0 -15px; border: 1px solid rgba(200, 232, 255, 0.6); transform: translate3d(-100px, -100px, 0); }
+
+/* 등장: 로고는 짧고 정확하게 */
+.is-live .brand { animation: logo-in 0.42s 0.86s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.is-live .tag, .is-live .rail { animation: fade-in 0.5s 1.2s both; }
+.is-live .hint { animation: fade-in 0.6s 1.5s both; }
+@keyframes logo-in { from { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateX(-6px); } to { opacity: 1; clip-path: inset(0 0 0 0); transform: none; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+a:focus-visible, button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; border-radius: 2px; }
+
+.fallback { display: none; position: absolute; left: var(--pad); right: var(--pad); top: 50%; transform: translateY(-50%); max-width: 34em; font-size: 15px; line-height: 1.7; color: var(--dim); }
+.no-gl .fallback { display: block; }
+.no-gl .hint, .no-gl .rail { display: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+@media (max-width: 640px) {
+  /* 좁은 화면: 안내 글자 뒤만 검게 눌러 읽히게 한다 */
+  .stage::after { content: ""; position: absolute; inset: auto 0 0; height: 30%; background: linear-gradient(to top, #00010a 34%, rgba(0, 1, 10, 0)); pointer-events: none; }
+  .hint, .rail { z-index: 2; }
+  .tag { display: none; }
+  .hint { bottom: calc(var(--pad) + 30px); font-size: 13.5px; }
+  .rail { left: var(--pad); right: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-live .brand, .is-live .tag, .is-live .rail, .is-live .hint { animation: fade-in 0.4s both; }
+  #field { animation: fade-in 0.5s both; }
+}
