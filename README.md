@@ -53,6 +53,7 @@ vite.config.js                 배포 경로(base)와 빌드에 포함할 두 �
 | `/concept-b-livefield.html` | B안 LIVE FIELD 입자 시안(`src/concept-b/`) |
 | `/bus-preview.html` | 버스 모델 확인용 화면(모델만 돌려 보기, 이전 모델 전환). `/concept-b.html?bus=v1` 은 이전 버스 모델로 같은 장면을 보여 준다 |
 | `_backup_2026-11-26_before-transfer/` | 전달 연출·첫 로드 로고·안내 문구 수정 직전의 `concept-b.html`, `stop.js`, `main.js`, `journey.css`, `bus.js`, README. `/concept-b.html?fx=v2` 는 이전 전달 연출을 보여 준다 |
+| `_backup_2026-11-26_before-node/` | 정보 노드·스크롤 연동 전달·중앙 로고 수정 직전의 `concept-b.html`, `stop.js`, `world.js`, `main.js`, `journey.css`, README. 같은 이름의 파일에 덮어쓰면 그때의 화면으로 돌아간다 |
 | `_backup_2026-11-26_before-city/` | 도시 배경·선·도트 개선 직전의 `world.js`, `stop.js`, `main.js`, `README.md`, `poster.jpg`. `/concept-b.html?city=v1` 은 이전 배경으로 같은 장면을 보여 준다 |
 | `_backup_2026-11-26_before-bus-model/` | 버스 모델 개선 직전의 `bus.js`, `main.js`, `world.js`, `poster.jpg`, `README.md` |
 | `_backup_2026-11-26_before-contact/` | 이번 전환 직전의 `index.html`, `concept-b.html`, `vite.config.js`, `README.md` 원본과 되돌리는 법 |

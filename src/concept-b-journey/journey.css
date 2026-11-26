@@ -22,8 +22,9 @@ body { margin: 0; min-height: 100%; background: var(--black); color: var(--ink);
 p, h1, h2, ol, ul { margin: 0; padding: 0; }
 ol, ul { list-style: none; }
 
-/* 화면 높이의 5.8배가 진행률 1. 전체 진행률 2.4 → 100 + 580 × 2.4 */
-.scroll-space { height: 1492vh; }
+/* 화면 높이의 5.8배가 진행률 1. 정보가 전달되는 두 구간(BIT, BIS)은 같은 진행률에 스크롤을 더 길게 배정한다(main.js 의 CUTS).
+   스크롤 길이 2.6475 → 100 + 580 × 2.6475 */
+.scroll-space { height: 1636vh; }
 .stage { position: fixed; inset: 0; overflow: hidden; }
 #scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 0.18s; }
 .is-ready #scene { opacity: 1; }
@@ -83,13 +84,22 @@ ol, ul { list-style: none; }
 .rail li.is-now button { color: var(--ink); }
 .rail li.is-later { opacity: 0.38; }
 
+/* 정보 노드의 표지: 3D 노드 옆에 붙는 작은 노선번호와 운행 상태. 올리거나 초점을 주면 짧은 정보가 펼쳐진다 */
+.node-tag { position: absolute; left: 0; top: 0; z-index: 2; display: block; margin: 0; padding: 9px 10px 9px 8px; border: 0; border-radius: 8px; background: none; font: 600 13px/1 var(--font-kr); color: #d9e9ff; text-align: left; white-space: nowrap; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0s 0.3s, background-color 0.25s; will-change: transform; -webkit-tap-highlight-color: transparent; }
+.node-tag.is-on { opacity: 1; visibility: visible; transition: opacity 0.3s, background-color 0.25s; }
+.has-cursor .node-tag { cursor: none; }
+.node-tag__no { display: inline-block; min-width: 27px; margin-right: 7px; padding: 4px 6px 3px; border-radius: 5px; background: var(--cyan); font-weight: 700; font-size: 12.5px; color: #03101f; text-align: center; vertical-align: middle; }
+.node-tag__st { display: inline-block; vertical-align: middle; text-shadow: 0 0 5px #000105, 0 0 2px #000105, 0 0 10px #000105; }
+/* 펼쳐지는 짧은 정보: 닫혀 있을 때는 자리를 차지하지 않는다(읽기 프로그램에는 항상 들린다) */
+.node-tag__more { position: absolute; left: 8px; top: 100%; display: grid; gap: 6px; opacity: 0; pointer-events: none; font-weight: 400; font-size: 13px; color: #b9c7de; }
+.node-tag__more b { font-weight: 600; color: #fff; }
+.node-tag.is-hot { background: rgba(3, 10, 22, 0.84); box-shadow: inset 0 0 0 1px rgba(70, 207, 255, 0.4); }
+.node-tag.is-hot .node-tag__more { position: static; margin-top: 9px; opacity: 1; transition: opacity 0.3s 0.05s; }
+.node-tag.is-hot .node-tag__st { color: #fff; text-shadow: none; }
+.no-gl .node-tag { display: none; }
+
 .fontnote { position: absolute; right: var(--pad); bottom: var(--pad); z-index: 2; margin: 0; transition: opacity 0.7s; text-align: right; font-size: 12.5px; line-height: 1.6; color: var(--dim); }
 .fontnote:empty { display: none; }
-/* 첫 로드의 로고: 문구가 놓일 자리에서 짧고 부드럽게 선명해졌다가, 헤더 로고와 헤드라인에 자리를 넘긴다 */
-.intro-logo { position: absolute; left: var(--pad); top: 50%; z-index: 3; width: clamp(240px, 27vw, 430px); line-height: 0; opacity: 0; visibility: hidden; filter: blur(7px); transform: translateY(-50%) scale(1.015); transform-origin: left center; pointer-events: none; transition: opacity 0.32s ease, filter 0.32s ease, transform 0.32s ease, visibility 0s 0.32s; }
-.intro-logo svg { display: block; width: 100%; height: auto; }
-.intro-logo-on .intro-logo { opacity: 1; visibility: visible; filter: blur(0); transform: translateY(-50%) scale(1); transition: opacity 0.45s ease, filter 0.5s ease, transform 0.5s ease; }
-.no-gl .intro-logo { display: none; }
 
 .cursor { display: none; position: fixed; left: 0; top: 0; z-index: 10; pointer-events: none; }
 .has-cursor .cursor { display: block; }
@@ -97,11 +107,12 @@ ol, ul { list-style: none; }
 .cursor__dot { width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; background: #e6f6ff; }
 .cursor__ring { width: 30px; height: 30px; margin: -15px 0 0 -15px; border: 1px solid rgba(90, 200, 255, 0.7); }
 
-/* 불러오는 동안: 로고와 가는 선 */
+/* 불러오는 동안: 검정 화면 정중앙의 로고(받은 SVG 그대로, 색과 비율을 바꾸지 않는다)와 그 아래의 가는 선.
+   선은 로고 상자 밖에 띄워 두어 로고의 보이는 형태가 화면 한가운데에 온다 */
 .loader { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; background: var(--black); transition: opacity 0.18s, visibility 0s 0.18s; }
-.loader svg { width: 150px; height: auto; }
-.loader svg path { fill: var(--ink); }
-.loader i { display: block; width: 150px; height: 1px; margin-top: 18px; background: linear-gradient(90deg, transparent, var(--cyan), transparent); background-size: 60% 100%; background-repeat: no-repeat; animation: load 1.1s linear infinite; }
+.loader__in { position: relative; line-height: 0; }
+.loader__logo { display: block; width: clamp(200px, 24vw, 340px); max-width: 72vw; height: auto; }
+.loader i { position: absolute; left: 50%; top: calc(100% + 20px); width: 150px; height: 1px; margin-left: -75px; background: linear-gradient(90deg, transparent, var(--cyan), transparent); background-size: 60% 100%; background-repeat: no-repeat; animation: load 1.1s linear infinite; }
 @keyframes load { from { background-position: -80% 0; } to { background-position: 180% 0; } }
 .is-ready .loader { opacity: 0; visibility: hidden; }
 
@@ -124,10 +135,10 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--cyan); outline-
   .cta { min-height: 52px; }
   .to-contact { font-size: 14.5px; }
   .fontnote { left: var(--pad); text-align: left; font-size: 12px; }
-  .intro-logo { top: 30%; width: min(74vw, 340px); }
   .scroll-hint { bottom: calc(var(--pad) + 112px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .copy.is-on .ch, .copy.is-on .copy__name, .copy.is-on .copy__desc { transition: opacity 0.3s; transform: none; }
   .scroll-hint::after, .loader i { animation: none; }
+  .node-tag, .node-tag__more { transition: none; }
 }

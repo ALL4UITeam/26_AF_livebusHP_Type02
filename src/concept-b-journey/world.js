@@ -328,10 +328,11 @@ export function buildWorld(THREE, scene, { mobile, bodyGeometry, path = [] }) {
   /* ── 선 ②: 선택 노선(주인공 버스가 달리는 길). 선명한 시안. 버스의 실제 경로(차로 변경 포함)를 따라 노면에 놓인다 ── */
   const rp = []; { const zAt = (x) => { if (!path.length || x <= path[0][0]) return 0; for (let i = 1; i < path.length; i++) if (path[i][0] >= x) { const [xa, za] = path[i - 1], [xb2, zb2] = path[i]; return za + ((zb2 - za) * (x - xa)) / Math.max(1e-6, xb2 - xa); } return path[path.length - 1][1]; };
     for (let x = X0 + 30; x <= X1 - 28; x += 4) rp.push([x, zAt(x)]); }
-  const routeU = { uBusX: { value: 0 }, uRoute: { value: 0 }, uAhead: { value: 0 } };
+  const routeU = { uBusX: { value: 0 }, uRoute: { value: 0 }, uAhead: { value: 0 }, uPing: { value: 0 } };
   const routeL = fatLines(THREE, rp.length - 1, { px: [1.3, 3.4], cap: 0, uniforms: routeU,
-    frag: `uniform float uBusX, uRoute, uAhead; vec4 shade() { float x = vE.x, behind = 1.0 - smoothstep(uBusX - 9.0, uBusX - 5.0, x), ahead = smoothstep(uBusX + 5.5, uBusX + 12.0, x);
+    frag: `uniform float uBusX, uRoute, uAhead, uPing; vec4 shade() { float x = vE.x, behind = 1.0 - smoothstep(uBusX - 9.0, uBusX - 5.0, x), ahead = smoothstep(uBusX + 5.5, uBusX + 12.0, x);
       float k = behind * smoothstep(uBusX - 330.0, uBusX - 70.0, x) + ahead * (1.0 - smoothstep(uBusX + 140.0, uBusX + 430.0, x)) * 0.5 * uAhead;
+      k *= 1.0 + 0.85 * uPing * exp(-pow((x - uBusX) / 60.0, 2.0));                              // 위치가 갱신되면 이 차량이 지나는 구간만 잠깐 밝아진다
       return vec4(vec3(0.15, 0.7, 1.0) * k * uRoute * lineA(), 1.0); }` });
   for (let i = 0; i < rp.length - 1; i++) routeL.set(i, [rp[i][0], 0.05, rp[i][1]], [rp[i + 1][0], 0.05, rp[i + 1][1]], [rp[i][0], 0, 0, 0], [rp[i + 1][0], 0, 0, 0], 0.5);
   routeL.done(); scene.add(routeL.mesh);
@@ -339,10 +340,10 @@ export function buildWorld(THREE, scene, { mobile, bodyGeometry, path = [] }) {
   const NSK = mobile ? 12 : 30, streaks = [];
   for (let i = 0; i < NSK; i++) { const st = streets[Math.floor(R() * streets.length)], flip = R() < 0.5; streaks.push({ st, flip, len: Math.hypot(st[2] - st[0], st[3] - st[1]), speed: 9 + R() * 9, phase: R(), tail: 5 + R() * 4 }); }
   const streakL = fatLines(THREE, NSK, { px: [1.0, 2.4], frag: `vec4 shade() { float t = along(); return vec4((vec3(0.14, 0.42, 0.95) * t * t + vec3(0.6, 0.86, 1.0) * smoothstep(0.88, 1.0, t)) * vE.x * lineA(), 1.0); }` }); scene.add(streakL.mesh);
-  /* ── 도트 ④: 위치(다른 버스, 주인공의 표식)와 차량의 등 ── */
+  /* ── 도트 ④: 위치(다른 버스의 작은 노드)와 차량의 등. 주인공의 정보 노드는 node.js 가 그린다 ── */
   const lightD = dots(THREE, nL * 4, { px: [1.6, 7] }); scene.add(lightD.mesh);
-  const posD = dots(THREE, nL + 1, { px: [5, 15], depthTest: false, order: 7 }); scene.add(posD.mesh);
-  const stemL = fatLines(THREE, 1, { px: [1.0, 1.8], frag: 'vec4 shade() { return vec4(vec3(0.15, 0.7, 1.0) * (0.25 + 0.75 * along()) * vE.x * lineA(), 1.0); }' }); scene.add(stemL.mesh);
+  const posD = dots(THREE, nL, { px: [3.5, 10], depthTest: false, order: 7 }); scene.add(posD.mesh);
+  const stemL = fatLines(THREE, nL, { px: [0.8, 1.3], cap: 0, depthTest: false, frag: 'vec4 shade() { return vec4(vec3(0.08, 0.3, 0.8) * (0.3 + 0.7 * along()) * vE.x * lineA(), 1.0); }' }); scene.add(stemL.mesh);   // 다른 버스: 지붕에서 올라가는 짧고 어두운 선
   const order = lanes.map((_, i) => i);
 
   /* 주인공 버스 둘레: 접지 그림자, 차체 아래로 번지는 옅은 빛, 전조등이 비추는 노면 */
@@ -354,7 +355,7 @@ export function buildWorld(THREE, scene, { mobile, bodyGeometry, path = [] }) {
 
   const yAxis = new THREE.Vector3(0, 1, 0), one = new THREE.Vector3(1, 1, 1), gs = new THREE.Vector3(9.4, 1.1, 0.02), sm = (a, b, x) => smooth(a, b, x);
   /**
-   * @param s { busX, busZ, dist, time, reveal(열린 반경 m), ahead, low, far, net, sig, head, pulseX·pulse, px, res([가로, 세로] px), routeK(선택 노선의 밝기) }
+   * @param s { busX, busZ, dist, time, reveal(열린 반경 m), ahead, low, far, net, sig, head, pulseX·pulse, px, res([가로, 세로] px), routeK(선택 노선의 밝기), aheadK(앞쪽 노선), ping(위치 갱신 때 구간이 밝아지는 정도) }
    */
   world.update = (s) => {
     U.uBus.value.set(s.busX, s.reveal, s.ahead, s.low || 0); U.uT.value = s.time; U.uFar.value = s.far; U.uNet.value = s.net; U.uPx.value = s.px; U.uPulse.value.set(s.pulseX || 0, s.pulse || 0); U.uFog.value = 0.001 + 0.0013 * s.far;
@@ -370,12 +371,14 @@ export function buildWorld(THREE, scene, { mobile, bodyGeometry, path = [] }) {
       [[5.5, 0.85, 0.85], [5.5, 0.85, -0.85], [-5.52, 1.4, 0.95], [-5.52, 1.4, -0.95]].forEach(([lx, ly, lz], k) => lightD.set(i * 4 + k, [pa[0] + lx * cy + lz * sy, ly, pa[1] - lx * sy + lz * cy], 0.5, k < 2 ? [0.8, 0.9, 1.0] : [0.75, 0.07, 0.09], rv, 0.34, 0.55));
       /* 위치 도트: 차례로 켜지고, 버스마다 다른 박자로 아주 천천히 숨쉰다 */
       const on = sm(order.indexOf(i) / nL, order.indexOf(i) / nL + 0.12, s.sig);
-      posD.set(i, [pa[0], 4.6, pa[1]], 2.2, [0.26, 0.56, 1.0], on * (0.82 + 0.18 * Math.sin(s.time * 1.1 + i * 2.4)), 0.24, 0.42);
+      /* 다른 버스의 노드: 작고 어둡다(주인공만 선명한 시안). 한꺼번에 깜빡이지 않는다 */
+      const oa = on * (0.82 + 0.18 * Math.sin(s.time * 1.1 + i * 2.4));
+      posD.set(i, [pa[0], 7.4, pa[1]], 1.7, [0.2, 0.46, 0.98], oa * 0.72, 0.26, 0.3);
+      stemL.set(i, [pa[0], 3.4, pa[1]], [pa[0], 6.9, pa[1]], [oa * 0.55, 0, 0, 0], [oa * 0.55, 0, 0, 0], 0.12);
     });
     oBody.instanceMatrix.needsUpdate = oGlass.instanceMatrix.needsUpdate = true; lightD.done();
-    posD.set(nL, [s.busX, 13.6, bz], 3.4, [0.3, 0.86, 1.0], s.net, 0.26, 0.6); posD.done();   // 주인공: 더 크고 시안에 가까운 도트
-    stemL.set(0, [s.busX, 3.6, bz], [s.busX, 13.0, bz], [s.net, 0, 0, 0], [s.net, 0, 0, 0], 0.16); stemL.done();
-    routeU.uBusX.value = s.busX; routeU.uRoute.value = s.routeK ?? s.net; routeU.uAhead.value = s.net;
+    posD.done(); stemL.done(); posD.mesh.visible = stemL.mesh.visible = s.sig > 0.002;
+    routeU.uBusX.value = s.busX; routeU.uRoute.value = s.routeK ?? s.net; routeU.uAhead.value = s.aheadK ?? s.net; routeU.uPing.value = s.ping || 0;
     streakL.mesh.visible = s.net > 0.002;
     if (streakL.mesh.visible) {
       const edge = s.net * 230;

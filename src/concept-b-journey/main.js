@@ -1,7 +1,8 @@
 /**
- * LIVEBUS — 서비스 경험 페이지(4차): 첫 등장 → LIVEBUS → BMS → BIT → BIS → 도입 문의 제안
+ * LIVEBUS — 서비스 경험 페이지(6차): 첫 등장 → LIVEBUS → BMS → BIT → BIS → 도입 문의 제안
  *
- * 스크롤 진행률 하나가 버스 위치, 바퀴 회전, 카메라, 환경, 기기 화면, 문구를 모두 정한다.
+ * BMS 에서 버스 위에 나타난 '정보 노드'가 정류장까지 함께 가고, 같은 노드에서 BIT 와 BIS 로 정보가 전해진다(node.js, stop.js).
+ * 스크롤 진행률 하나가 버스 위치, 바퀴 회전, 카메라, 환경, 정보 전달, 기기 화면, 문구를 모두 정한다.
  * 스크롤을 멈추면 주행도 멈추고, 올리면 그대로 되돌아간다. 첫 로드의 오프닝만 시간으로 흐른다.
  * three.js(r128)는 concept-b.html 의 <script> 로 불러온 전역 THREE 를 쓴다.
  */
@@ -12,13 +13,16 @@ import * as worldV1 from './world-v1.js';
 import * as stopNow from './stop.js';
 import * as stopV1 from './stop-v1.js';
 import * as stopV2 from './stop-v2.js';
-import { TL } from './stop.js';
+import * as stopV3 from './stop-v3.js';
+import { TL, ROUTE, transferU, nodeEmph } from './stop.js';
+import { buildNode } from './node.js';
 
 /* 버스 모델: 기본은 개선 모델. 주소에 ?bus=v1 을 붙이면 이전 모델로 바꿔 비교할 수 있다(바퀴 반지름과 기준점은 두 모델이 같다) */
 const { buildBus, BUS, SIGNAL, bodyGeometry } = new URLSearchParams(window.location.search).get('bus') === 'v1' ? busV1 : busNow;
 /* 도시 배경과 선·도트: 기본은 개선판. ?city=v1 을 붙이면 이전 배경으로 같은 장면을 본다 */
 const CITY_V1 = new URLSearchParams(window.location.search).get('city') === 'v1';
-const { buildEnvironment, buildWorld } = CITY_V1 ? worldV1 : worldNow, { buildStop } = CITY_V1 ? stopV1 : new URLSearchParams(window.location.search).get('fx') === 'v2' ? stopV2 : stopNow;   // ?fx=v2: 스크롤에 묶여 있던 이전 전달 연출
+const FX_OLD = new URLSearchParams(window.location.search).get('fx');
+const { buildEnvironment, buildWorld } = CITY_V1 ? worldV1 : worldNow, { buildStop } = CITY_V1 ? stopV1 : FX_OLD === 'v2' ? stopV2 : FX_OLD === 'v3' ? stopV3 : stopNow;   // ?fx=v2, ?fx=v3: 이전 전달 연출(지붕의 신호점에서 출발. v3 는 시간으로 재생)
 
 const $ = (s) => document.querySelector(s);
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -56,7 +60,7 @@ const KEYS = [
 function BIT_W() { return { az: 29.6, r: 23.9, h: 1.75, lx: 10.96, ly: 1.9, lz: 1.82, fov: 30, shift: 0.04 }; }
 function BIT_N() { return { az: 23.8, r: 26.0, h: 1.7, lx: 13.27, ly: 1.8, lz: 3.31, fov: 40, vs: 0.11 }; }
 function BIS_W() { return { az: 40, r: 28, h: 1.7, lx: 8.2, ly: 1.85, lz: 3.02, fov: 32, shift: 0.02 }; }
-function BIS_N() { return { az: 33.6, r: 30.15, h: 1.7, lx: 12.8, ly: 1.7, lz: 3.54, fov: 40, vs: -0.085 }; }
+function BIS_N() { return { az: 33.6, r: 30.15, h: 1.7, lx: 12.1, ly: 1.7, lz: 3.54, fov: 43, vs: -0.068 }; }   // 세로 화면: 버스 위의 노드와 안내기가 함께 들어오도록 조금 넓게 본다
 /* 첫 로드의 오프닝이 시작하는 구도: 앞머리 모서리·전조등·유리 일부가 화면 가까이 있다 */
 const OPEN = { w: { az: 19, r: 7.7, h: 1.3, lx: 5.0, ly: 1.02, lz: 0.8, fov: 30, shift: 0, vs: 0 }, n: { az: 15, r: 9.8, h: 1.35, lx: 5.1, ly: 1.3, lz: 0.6, fov: 34, shift: 0, vs: 0.05 } };
 
@@ -102,6 +106,15 @@ const laneZ = (p) => STOP.z * smooth(1.04, 1.3, p) * (1 - smooth(TL.depart + 0.0
 /* 카메라 기준점이 버스에서 정류장 자리로 옮겨 가는 정도(정차 직전에 고정, 출발하면 다시 버스를 따라간다) */
 const stopHold = (p) => smooth(1.265, 1.35, p) * (1 - smooth(TL.depart, TL.depart + 0.08, p));
 const easeIO = (t) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+const gauss = (x, c, w) => Math.exp(-(((x - c) / w) ** 2));
+
+/* 스크롤 거리 ↔ 진행률. 진행률의 값(구도, 문구, 주행)은 그대로 두고, 정보가 전달되는 두 구간에만 스크롤을 더 길게 배정한다.
+   [이 진행률부터, 진행률 1 에 드는 스크롤(화면 높이 5.8배가 1)] — BIT 전달 구간은 1.9배, BIS 전달 구간은 1.45배 */
+const CUTS = [[0, 1], [TL.bit[0], 1.9], [TL.bit[1], 1], [TL.bis[0], 1.45], [TL.bis[1], 1], [G, 0]];
+export const toS = (p) => { let s = 0; for (let i = 0; i < CUTS.length - 1; i++) s += (clamp(p, CUTS[i][0], CUTS[i + 1][0]) - CUTS[i][0]) * CUTS[i][1]; return s; };
+export const toP = (s) => { let p = 0; for (let i = 0; i < CUTS.length - 1; i++) { const len = (CUTS[i + 1][0] - CUTS[i][0]) * CUTS[i][1]; p += clamp(s, 0, len) / CUTS[i][1]; s -= len; } return p; };
+/* 정보 노드의 높이(m): BMS 에서는 도시 위로 높이, 정류장에서는 버스 지붕 가까이. [가로 화면, 세로 화면] */
+const NODE_Y = { city: 13.6, bit: [5.1, 5.6], bis: [5.1, 4.2] };   // 세로 화면의 BIS 에서는 위쪽 문구와 겹치지 않게 지붕 가까이 내린다
 
 /* 문구: 한 번에 하나만. 들어올 때는 글자마다 짧은 시간차, 나갈 때는 전체가 함께 */
 function setupCopy() {
@@ -169,6 +182,7 @@ function start() {
   const path = []; for (let g = 0.15; g <= G; g += 0.01) path.push([distanceAt(g), laneZ(g)]);
   const world = buildWorld(THREE, scene, { mobile, bodyGeometry, path });
   const stop = buildStop(THREE, scene, bus.materials, STOP, path);
+  const node = CITY_V1 ? null : buildNode(THREE, scene);                                    // 이전 도시(?city=v1)는 자기 표식을 그대로 쓴다
   const updateCopy = setupCopy();
 
   let W = 1, H = 1, dprCap = mobile ? 1.5 : 2, dpr = 1;
@@ -188,11 +202,11 @@ function start() {
   }, { passive: true });
   root.addEventListener('pointerleave', () => { ptr.on = false; });
 
-  /* 스크롤 → 진행률. 화면 높이의 5.8배가 진행률 1(2차부터 같은 길이) */
+  /* 스크롤 → 진행률. 화면 높이의 5.8배가 진행률 1(2차부터 같은 길이). 전달 구간만 toP 로 늘려 놓았다 */
   const SPAN = () => 5.8 * window.innerHeight;
   let pTarget = 0, p = 0, snapUntil = restoring ? performance.now() + 900 : 0;
-  const onScroll = () => { pTarget = clamp(window.scrollY / SPAN(), 0, G); };
-  const ANCHORS = [0, 0.9, 1.45, 1.8, G], nearest = (v) => ANCHORS.reduce((a, b) => (Math.abs(b - v) < Math.abs(a - v) ? b : a));
+  const onScroll = () => { pTarget = clamp(toP(window.scrollY / SPAN()), 0, G); };
+  const ANCHORS = [0, 0.9, 1.52, 1.85, G], nearest = (v) => ANCHORS.reduce((a, b) => (Math.abs(b - v) < Math.abs(a - v) ? b : a));
   window.addEventListener('scroll', onScroll, { passive: true }); onScroll();
   p = reduce ? nearest(pTarget) : pTarget;
   /* 마지막 3D 위치를 기억해 둔다. 브라우저가 뒤로 가기에서 스크롤을 되돌리지 못한 경우에만 쓴다 */
@@ -200,16 +214,39 @@ function start() {
   window.addEventListener('pagehide', remember);
   if (navType === 'back_forward') {
     const saved = parseFloat(memory.get('lb:journey-p'));
-    if (saved > 0.01) setTimeout(() => { if (window.scrollY < 4) window.scrollTo(0, saved * SPAN()); }, 250);
+    if (saved > 0.01) setTimeout(() => { if (window.scrollY < 4) window.scrollTo(0, toS(saved) * SPAN()); }, 250);
   }
   window.addEventListener('pageshow', (e) => { if (e.persisted) { last = performance.now(); onScroll(); p = reduce ? nearest(pTarget) : pTarget; } });
   /* 아래 진행 내비게이션: 누르면 그 구간으로 간다. 마지막 버튼과 CTA 는 문의 페이지로 */
-  document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => window.scrollTo({ top: Math.ceil(+b.dataset.go * SPAN()), behavior: reduce ? 'auto' : 'smooth' })));
+  document.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => window.scrollTo({ top: Math.ceil(toS(+b.dataset.go) * SPAN()), behavior: reduce ? 'auto' : 'smooth' })));
   document.querySelectorAll('a[data-contact]').forEach((a) => a.addEventListener('click', remember));
 
   const ray = new THREE.Raycaster(), hit = new THREE.Vector3(), boxLocal = new THREE.Box3(new THREE.Vector3(-5.6, 0.2, -1.5), new THREE.Vector3(5.7, 3.4, 1.5)), boxW = new THREE.Box3();
   const railMark = $('.rail__mark'), railItems = [...document.querySelectorAll('.rail li')];
-  const look = new THREE.Vector3(), signal = new THREE.Vector3();
+  const look = new THREE.Vector3(), signal = new THREE.Vector3(), nodeAt = new THREE.Vector3(), pr = new THREE.Vector3(), boxHot = new THREE.Box3();
+
+  /* 정보 노드의 표지(노선번호·운행 상태)와 선택: 버스나 노드에 올리기·키보드 초점·탭 → 노드·링크 선·노선이 함께 강조되고 짧은 정보가 펼쳐진다 */
+  const tag = $('.node-tag'), tagNo = $('.node-tag__no'), tagSt = $('.node-tag__st'), tagDest = $('.node-tag__dest'), tagNext = $('.node-tag__next');
+  const sel = { pinned: false, over: false, focus: false, bus: false, s: 0, w: 0, h: 0, text: '', shown: false, hot: false };
+  if (tag) {
+    tagNo.textContent = ROUTE.no; tagDest.textContent = `${ROUTE.no}번 · ${ROUTE.dest}`;
+    tag.addEventListener('pointerenter', (e) => { if (e.pointerType !== 'touch') sel.over = true; });
+    tag.addEventListener('pointerleave', () => { sel.over = false; });
+    tag.addEventListener('focus', () => { sel.focus = tag.matches(':focus-visible'); });
+    tag.addEventListener('blur', () => { sel.focus = false; });
+    tag.addEventListener('click', () => { sel.pinned = !sel.pinned; });
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') { sel.pinned = false; sel.focus = false; } });
+    /* 탭: 버스를 누르면 선택, 다른 곳을 누르면 해제(끌어서 스크롤한 것은 탭으로 보지 않는다) */
+    let down = null;
+    window.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; }, { passive: true });
+    window.addEventListener('pointerup', (e) => {
+      if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 10 || performance.now() - down.t > 600 || e.target.closest?.('.node-tag, a, button')) return;
+      const r = stage.getBoundingClientRect();
+      ray.setFromCamera({ x: ((e.clientX - r.left) / r.width) * 2 - 1, y: -(((e.clientY - r.top) / r.height) * 2 - 1) }, camera);
+      const onBus = sel.shown && !!ray.ray.intersectBox(boxHot, hit);
+      sel.pinned = e.pointerType === 'touch' ? (onBus ? !sel.pinned : false) : onBus ? sel.pinned : false;
+    }, { passive: true });
+  }
   let last = performance.now(), born = 0, time = 0, slow = 0, frames = 0, fade = 1, fadeTarget = 1, cursorAmt = 0;
 
   function frame(now) {
@@ -230,7 +267,8 @@ function start() {
     /* ── 오프닝(시간 기준, 약 2.5초). 스크롤 구도 위에 얹는 변화라서, 도중에 스크롤하면 그만큼 옅어지며 스크롤 구도로 합류한다 ──
        0.0 앞머리 모서리와 전조등이 화면 가까이. 버스가 굴러 들어오고 카메라가 붙어 간다(차선이 스쳐 지나간다)
        0.25~1.45 가는 빛이 차체 곡면을 따라 앞에서 뒤로 → 0.6~2.2 카메라가 물러나며 전면과 측면이 드러난다
-       1.2~2.2 빛이 노면을 따라 짧게 흐른다 → 1.3~2.1 첫 로드의 로고 → 2.0 헤더 로고, 2.15 헤드라인 → 2.5 스크롤 시작 구도에 정착 */
+       1.2~2.2 빛이 노면을 따라 짧게 흐른다 → 1.45 헤더 로고, 1.75 헤드라인 → 2.5 스크롤 시작 구도에 정착
+       (첫 로드의 중앙 로고는 이 오프닝보다 앞, 불러오는 동안의 검정 화면에 있다: concept-b.html 의 .loader) */
     const oJoin = 1 - smooth(0.015, 0.16, p);                                               // 스크롤로 떠나면 오프닝의 몫이 줄어든다
     const oCam = (1 - easeIO(clamp((sec - 0.1) / 2.4, 0, 1))) * oJoin;
     const oRoll = -10 * (1 - clamp(sec / 1.85, 0, 1)) ** 2.2 * oJoin;                       // 멈추기 전 마지막 10m 를 굴러 들어온다
@@ -284,24 +322,62 @@ function start() {
 
     /* 커서가 차체에 닿으면 그 작은 영역에만 약한 반사광이 돈다 */
     let near = 0;
-    if (ptr.on && !reduce && sec > 2.5) {
+    boxW.copy(boxLocal).translate(bus.group.position); boxHot.copy(boxW).expandByScalar(0.4 + 2.2 * high);   // 멀리서는 작은 버스를 가리키기 쉽게 조금 넉넉히
+    sel.bus = false;
+    if (ptr.on && sec > 2.5) {
       ray.setFromCamera({ x: ptr.x, y: ptr.y }, camera);
-      boxW.copy(boxLocal).translate(bus.group.position);
-      if (ray.ray.intersectBox(boxW, hit)) { shared.cur.value.copy(hit); near = (1 - 0.8 * high) * (1 - 0.7 * hold); }
+      sel.bus = !!ray.ray.intersectBox(boxHot, hit);
+      if (!reduce && ray.ray.intersectBox(boxW, hit)) { shared.cur.value.copy(hit); near = (1 - 0.8 * high) * (1 - 0.7 * hold); }
     }
     cursorAmt += (near - cursorAmt) * (1 - Math.exp(-dt * 5)); shared.curAmt.value = cursorAmt;
 
+    /* ── 정보 노드: BMS 에서 나타나 정류장까지 같은 모습으로 버스와 함께 간다. 버스가 다시 떠날 때 물러난다 ──
+       높이와 크기만 카메라가 다가오는 흐름에 맞춰 바뀐다(색·형태·노선번호는 그대로). 화면에서의 크기는 거의 일정하다 */
+    const nodeK = node ? smooth(0.64, 0.84, p) * (1 - smooth(TL.depart + 0.02, TL.depart + 0.14, p)) : 0;
+    const nearY = lerp(lerp(NODE_Y.bit[0], NODE_Y.bit[1], narrow), lerp(NODE_Y.bis[0], NODE_Y.bis[1], narrow), smooth(TL.bit[1], TL.bis[0], p));
+    nodeAt.set(signal.x, lerp(NODE_Y.city, nearY, smooth(1.04, 1.3, p)), signal.z);
+    const nodePx = lerp(8.5, 12, leave) * clamp(H / 900, 0.85, 1.2), nodeR = (nodePx * camera.position.distanceTo(nodeAt) * Math.tan((c.fov * Math.PI) / 360)) / (H / 2);
+    const hotWant = nodeK > 0.5 && (sel.pinned || sel.over || sel.focus || sel.bus);
+    sel.s += ((hotWant ? 1 : 0) - sel.s) * (1 - Math.exp(-dt * 9));
+    const [uBit, uBis] = transferU(p), emph = reduce ? 0 : Math.max(nodeEmph(uBit), nodeEmph(uBis));
+    /* 위치 갱신(BMS 에서만, 3.6초에 한 번): 지붕의 작은 신호 → 링크 선을 따라 올라가는 빛 → 노드의 반응 → 이 차량의 노선 일부가 잠깐 밝아진다 */
+    const amb = reduce ? 0 : net, ph = time % 3.6;
+    const upd = { roof: amb * gauss(ph, 0.16, 0.13), blip: amb > 0.01 && ph > 0.2 && ph < 0.95 ? (ph - 0.2) / 0.75 : -1, react: amb * gauss(ph, 1.04, 0.2), ping: amb * smooth(0.98, 1.22, ph) * (1 - smooth(1.5, 2.5, ph)) };
+    node?.update({ node: nodeAt, base: signal, k: nodeK, rad: nodeR, hot: sel.s, emph, roof: upd.roof, blip: upd.blip, react: upd.react, spin: dist * 0.012 + time * 0.22 });
+
     /* 세계는 버스에서 가까운 곳부터 열린다: 버스 주변 → 앞쪽 도로 → 길가 → 도시 전체 */
     const reveal = (20 + 8 * oOpen + 60 * smooth(0.07, 0.2, p) + 130 * smooth(0.2, 0.46, p) + 500 * smooth(0.44, 0.7, p) * (1 - 0.5 * leave)) * (1 - 0.6 * end);
-    world.update({ busX, busZ, dist: distanceAt(p), time, reveal, low: 1 - smooth(0.06, 0.2, p), ahead: 9 * (1 - high), far, net, sig, head: headK * (1 - 0.6 * high) * (1 - 0.45 * leave) * (1 - 0.6 * hold), px: dpr * (H / 900), res: [W * dpr, H * dpr], routeK: Math.max(net, 0.5 * end),
+    world.update({ busX, busZ, dist: distanceAt(p), time, reveal, low: 1 - smooth(0.06, 0.2, p), ahead: 9 * (1 - high), far, net, sig, head: headK * (1 - 0.6 * high) * (1 - 0.45 * leave) * (1 - 0.6 * hold), px: dpr * (H / 900), res: [W * dpr, H * dpr], routeK: Math.max(net, 0.5 * end, 0.85 * sel.s * nodeK) * (1 + 0.4 * sel.s), aheadK: Math.max(net, sel.s * nodeK), ping: upd.ping,
       pulseX: busX + 8 + 95 * easeIO(oPulse), pulse: sec < 99 ? Math.sin(Math.PI * oPulse) ** 0.8 * 0.55 * oJoin : 0 });
     /* 정류장 구간: 기기 화면과 정보의 빛. 상태는 모두 진행률로 정해진다 */
-    stop.update({ g: p, time, busX, dist, signal, trailK: 0.42 * end, px: dpr * (H / 900), camera, slot, reduce, settled: Math.abs(pTarget - p) < 0.004 });
+    stop.update({ g: p, time, busX, dist, signal, node: nodeAt, nodeR, trailK: 0.42 * end, px: dpr * (H / 900), camera, slot, reduce, settled: Math.abs(pTarget - p) < 0.004 });
     renderer.render(scene, camera);
 
-    updateCopy(sec < 2.15 && p < 0.02 ? -9 : p);
-    root.classList.toggle('is-intro', sec < 2.0 && p < 0.02);                              // 헤더 로고는 오프닝 로고가 물러날 때 들어온다
-    root.classList.toggle('intro-logo-on', sec > 1.3 && sec < 2.1 && p < 0.02);           // 첫 로드의 로고: 버스 전체가 드러나고 카메라가 정착할 때 선명해진다
+    /* 노드의 표지: 3D 노드의 화면 위치 옆에 붙는다. 화면 밖이거나 스마트폰에 가려지는 자리에서는 숨긴다 */
+    if (tag) {
+      const stopped = p >= 1.38 && p < TL.depart, text = `${stopped ? '도착' : '운행 중'}|${ROUTE.stops[ROUTE.here + (stopped ? 1 : 0)]}`;
+      if (text !== sel.text) { sel.text = text; tagSt.textContent = stopped ? '도착' : '운행 중'; tagNext.innerHTML = `다음 정류장 <b>${ROUTE.stops[ROUTE.here + (stopped ? 1 : 0)]}</b>`; sel.w = 0;
+        tag.setAttribute('aria-label', `${ROUTE.no}번 버스 정보(시연용 예시): ${stopped ? '도착' : '운행 중'}, ${ROUTE.dest}, 다음 정류장 ${ROUTE.stops[ROUTE.here + (stopped ? 1 : 0)]}`); }
+      if (hotWant !== sel.hot) { sel.hot = hotWant; tag.classList.toggle('is-hot', hotWant); tag.setAttribute('aria-expanded', hotWant ? 'true' : 'false'); sel.w = 0; }
+      pr.copy(nodeAt).project(camera);
+      const sx = (pr.x * 0.5 + 0.5) * W, sy = (-pr.y * 0.5 + 0.5) * H;
+      let show = nodeK > 0.5 && pr.z < 1 && sx > 4 && sx < W - 4 && sy > 28 && sy < H - 28;
+      if (show && stop.phone.visible) {                                                     // 스마트폰의 화면 속 자리와 겹치면 표지를 내린다(3D 노드는 깊이 판정으로 가려진다)
+        const hh = slot.size * H * 0.5, hw = hh * 0.474; pr.copy(stop.phone.position).project(camera);
+        const cx = (pr.x * 0.5 + 0.5) * W, cy = (-pr.y * 0.5 + 0.5) * H;
+        if (sx > cx - hw - 6 && sx < cx + hw + 6 && sy > cy - hh - 6 && sy < cy + hh + 6) show = false;
+      }
+      if (show !== sel.shown) { sel.shown = show; tag.classList.toggle('is-on', show); tag.tabIndex = show ? 0 : -1; if (!show) { sel.pinned = false; if (document.activeElement === tag) tag.blur(); } }
+      if (show) {
+        if (!sel.w) { sel.w = tag.offsetWidth; sel.h = tag.offsetHeight; }
+        const gap = nodePx + 2, right = sx + gap + sel.w < W - 6;                           // 기본은 노드 오른쪽. 자리가 없으면 왼쪽
+        const rise = lerp(17, 28 + nodePx * 0.5 * (1 - narrow), leave);                                    // 정류장에서는 표지를 노드 위쪽으로 올려, 노드에서 떠나는 빛의 경로가 글자를 지나지 않게 한다
+        tag.style.transform = `translate3d(${(right ? sx + gap : sx - gap - sel.w).toFixed(1)}px, ${clamp(sy - rise, 6, H - sel.h - 6).toFixed(1)}px, 0)`;
+      }
+    }
+
+    updateCopy(sec < 1.75 && p < 0.02 ? -9 : p);
+    root.classList.toggle('is-intro', sec < 1.45 && p < 0.02);                             // 헤더 로고는 차체가 드러난 뒤에 들어온다
     railMark.style.transform = `scaleX(${(p / G).toFixed(4)})`;
     const sceneNow = p < 0.5 ? 0 : p < 1.2 ? 1 : p < 1.6 ? 2 : p < 2.02 ? 3 : 4;
     railItems.forEach((li, i) => li.classList.toggle('is-now', i === sceneNow));
@@ -312,7 +388,7 @@ function start() {
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
-  window.__journey = { stop, G, TL, playOpening, minGap: world.minGap, get p() { return p; }, get frames() { return frames; }, get dist() { return distanceAt(p); }, set born(v) { born = v; }, bus, camera, renderer, signal };
+  window.__journey = { stop, G, TL, toS, toP, transferU, sel, nodeAt, playOpening, minGap: world.minGap, get p() { return p; }, get frames() { return frames; }, get dist() { return distanceAt(p); }, set born(v) { born = v; }, bus, camera, renderer, signal };
 }
 
 /* 글꼴이 실제로 불러와졌는지 확인해 화면에 알린다 */
